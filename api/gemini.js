@@ -25,7 +25,7 @@ export default async function handler(req, res) {
 
     try {
         const {
-            model = 'gemini-2.0-flash',
+            model = 'gemini-2.5-flash',
             messages,
             temperature = 0.1,
             max_tokens = 50

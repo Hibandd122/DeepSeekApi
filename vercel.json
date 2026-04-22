@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/gemini.py": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    { "source": "/api/gemini", "destination": "/api/gemini" }
+  ]
+}

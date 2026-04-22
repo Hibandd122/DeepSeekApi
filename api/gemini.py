@@ -1,4 +1,3 @@
-# api/gemini.py
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
@@ -13,10 +12,10 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("Thiếu biến môi trường GEMINI_API_KEY")
 
-GEMINI_MODEL = "gemini-2.5-flash" # Bạn có thể đổi model tại đây
+# SỬA LỖI 1: Tên model phải là gemini-1.5-flash hoặc gemini-2.0-flash
+GEMINI_MODEL = "gemini-2.0-flash" 
 MAX_RETRIES = 3
 
-# Thiết lập logging cơ bản để dễ dàng theo dõi lỗi
 logging.basicConfig(level=logging.INFO)
 
 @app.route("/api/gemini", methods=["POST", "OPTIONS"])
@@ -51,38 +50,50 @@ def proxy_gemini():
         }
 
         answer_text = ""
+        last_error_msg = "" # Biến để lưu lại lỗi cuối cùng
+
         for attempt in range(MAX_RETRIES):
             try:
                 resp = requests.post(url, headers=headers, json=payload, timeout=8.0)
                 resp.raise_for_status()
                 gemini_data = resp.json()
 
-                # Kiểm tra và trích xuất câu trả lời
                 if "candidates" in gemini_data and len(gemini_data["candidates"]) > 0:
                     candidate = gemini_data["candidates"][0]
                     
-                    # Kiểm tra xem phản hồi có bị chặn bởi bộ lọc an toàn không
                     if candidate.get("finishReason") == "SAFETY":
                         logging.warning(f"Lần thử {attempt+1}: Phản hồi bị chặn bởi bộ lọc an toàn.")
-                        time.sleep(2 ** attempt) # Exponential backoff
+                        last_error_msg = "Blocked by SAFETY filter."
+                        time.sleep(2 ** attempt)
                         continue
 
                     if "content" in candidate and "parts" in candidate["content"]:
                         answer_text = candidate["content"]["parts"][0].get("text", "").strip()
                         if answer_text:
-                            break # Thành công, thoát vòng lặp
+                            break 
                         else:
-                            logging.warning(f"Lần thử {attempt+1}: Nhận được nội dung rỗng. Đang thử lại...")
+                            logging.warning(f"Lần thử {attempt+1}: Nhận được nội dung rỗng.")
+                            last_error_msg = "Empty content from API."
                             time.sleep(2 ** attempt)
                 else:
                     logging.warning(f"Lần thử {attempt+1}: Không tìm thấy 'candidates' trong phản hồi.")
+                    last_error_msg = "No candidates in response."
                     time.sleep(2 ** attempt)
 
             except requests.exceptions.RequestException as e:
-                logging.error(f"Lần thử {attempt+1}: Lỗi mạng hoặc API: {e}")
+                # Trích xuất lỗi chi tiết từ Google API nếu có
+                error_detail = e.response.text if hasattr(e, 'response') and e.response else str(e)
+                logging.error(f"Lần thử {attempt+1}: Lỗi mạng hoặc API: {error_detail}")
+                last_error_msg = error_detail
                 time.sleep(2 ** attempt)
 
-        # Trả về kết quả cuối cùng (có thể là rỗng nếu đã thử hết số lần)
+        # SỬA LỖI 2: Nếu đã thử hết các lần mà answer_text vẫn rỗng, trả về lỗi HTTP 500 thay vì HTTP 200 rỗng
+        if not answer_text:
+            return jsonify({
+                "error": "Failed to generate content after retries",
+                "details": last_error_msg
+            }), 502
+
         return jsonify({
             "choices": [{
                 "message": {

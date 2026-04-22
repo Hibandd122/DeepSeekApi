@@ -1,0 +1,19 @@
+{
+  "name": "deepseek-vercel-proxy",
+  "version": "1.0.0",
+  "description": "Proxy CORS cho DeepSeek API để sử dụng trong userscript Onluyen",
+  "main": "api/deepseek.js",
+  "scripts": {
+    "start": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "axios": "^1.6.8"
+  },
+  "devDependencies": {
+    "vercel": "^34.2.0"
+  },
+  "keywords": ["deepseek", "cors", "proxy", "vercel", "userscript"],
+  "author": "",
+  "license": "MIT"
+}
